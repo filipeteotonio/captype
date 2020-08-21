@@ -1,6 +1,7 @@
 package br.ironspark.model;
 
 import javax.persistence.Entity;
+import javax.validation.constraints.Max;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 
@@ -22,5 +23,9 @@ public class BaseUser {
 	@NotNull
 	@Size(max = 100, min = 5)
 	private String email;
+
+	@CaptureField
+	@Max(value = 105)
+	private Long strikes;
 
 }

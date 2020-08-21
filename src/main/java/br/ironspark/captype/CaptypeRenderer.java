@@ -1,5 +1,7 @@
 package br.ironspark.captype;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.util.Arrays;
@@ -8,7 +10,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.validation.constraints.AssertFalse;
+import javax.validation.constraints.AssertTrue;
+import javax.validation.constraints.Max;
+import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Pattern;
 import javax.validation.constraints.Size;
 
 import org.reflections.Reflections;
@@ -38,9 +45,9 @@ public class CaptypeRenderer {
 		return value;
 	}
 
-	public static void render(String path) throws JsonProcessingException {
+	public static void render(String scanPath, String filePath) throws JsonProcessingException {
 		Map<String, Map<String, CaptureType>> result = new HashMap<>();
-		Set<Class<?>> entities = new Reflections(path).getTypesAnnotatedWith(CaptureEntity.class);
+		Set<Class<?>> entities = new Reflections(scanPath).getTypesAnnotatedWith(CaptureEntity.class);
 
 		for (Class<?> entity : entities) {
 			String entityName = getEntityCaptureName(entity);
@@ -60,33 +67,76 @@ public class CaptypeRenderer {
 					Map<String, Object> fieldResult = new HashMap<>();
 
 					// required validation
-					boolean isRequired = fieldAnnotations.stream()
-							.anyMatch(annotation -> annotation.annotationType().equals(NotNull.class));
-					fieldResult.put("required", isRequired);
+					boolean isRequired = false;
+					for (Annotation annotation : fieldAnnotations) {
 
-					// size validation
-					Annotation annotation = fieldAnnotations.stream().filter(a -> a.annotationType().equals(Size.class))
-							.findFirst().orElse(null);
-					if (annotation != null) {
-						Map<String, Object> sizeMap = new HashMap<>();
-						sizeMap.put("min", ((Size) annotation).min());
-						sizeMap.put("max", ((Size) annotation).max());
-						fieldResult.put("size", sizeMap);
+						if (annotation.annotationType().equals(NotNull.class)) {
+							isRequired = true;
+						}
+
+						else if (annotation.annotationType().equals(Size.class)) {
+							Map<String, Object> sizeMap = new HashMap<>();
+							sizeMap.put("min", ((Size) annotation).min());
+							sizeMap.put("max", ((Size) annotation).max());
+							fieldResult.put("size", sizeMap);
+						}
+
+						else if (annotation.annotationType().equals(Max.class)) {
+							fieldResult.put("max", ((Max) annotation).value());
+						}
+
+						else if (annotation.annotationType().equals(Min.class)) {
+							fieldResult.put("min", ((Min) annotation).value());
+						}
+
+						else if (annotation.annotationType().equals(AssertTrue.class)) {
+							fieldResult.put("assertion", true);
+						}
+
+						else if (annotation.annotationType().equals(AssertFalse.class)) {
+							fieldResult.put("assertion", false);
+						}
+
+						else if (annotation.annotationType().equals(Pattern.class)) {
+							fieldResult.put("regex", ((Pattern) annotation).regexp());
+						}
+
 					}
 
+					// adds the required validation if any
+					fieldResult.put("required", isRequired);
+					// fills the field metadata
 					fieldCapture.setDisplayName(getFieldCaptureDisplayName(field));
 					fieldCapture.setDisplayOrder(getFieldCaptureDisplayOrder(field));
 					fieldCapture.setValidators(fieldResult);
+					// stores
 					entityResult.put(fieldName, fieldCapture);
 					result.put(entityName, entityResult);
 				}
 			}
 		}
 
+		try {
+			writeToFile(filePath, result);
+		} catch (IOException ex) {
+			ex.printStackTrace();
+		}
+
+	}
+
+	private static void writeToFile(String filePath, Map<String, Map<String, CaptureType>> result) throws IOException {
+
+		if (filePath == null || filePath.isEmpty()) {
+			filePath = "captype.json";
+		} else if (!filePath.endsWith(".json")) {
+			filePath.concat(".json");
+		}
+
+		FileWriter fw = new FileWriter(filePath);
 		ObjectMapper mapper = new ObjectMapper();
 		String jsonResult = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(result);
-
-		System.out.println(jsonResult);
-
+		fw.write(jsonResult);
+		fw.flush();
+		fw.close();
 	}
 }

@@ -2,6 +2,7 @@ package br.ironspark.model;
 
 import javax.persistence.Entity;
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Pattern;
 import javax.validation.constraints.Size;
 
 import br.ironspark.captype.CaptureEntity;
@@ -20,6 +21,7 @@ public class Project {
 
 	@CaptureField(name = "shortDescription", displayName = "Short description")
 	@NotNull
+	@Pattern(regexp = "abcdefg")
 	@Size(max = 100)
 	private String email;
 
