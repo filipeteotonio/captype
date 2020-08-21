@@ -6,6 +6,12 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Models the metadata of a field
+ * 
+ * @author filipemendonca
+ *
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

@@ -23,6 +23,13 @@ import org.reflections.Reflections;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+/**
+ * Scans the entities annotated with {@link CaptureEntity} and creates metadata
+ * json file
+ * 
+ * @author filipemendonca
+ *
+ */
 public class CaptypeRenderer {
 
 	private static String getEntityCaptureName(Class<?> entity) {
@@ -45,6 +52,13 @@ public class CaptypeRenderer {
 		return value;
 	}
 
+	/**
+	 * Scans the entities in the scanPath and creates a JSON file at filePath
+	 * 
+	 * @param scanPath
+	 * @param filePath
+	 * @throws JsonProcessingException
+	 */
 	public static void render(String scanPath, String filePath) throws JsonProcessingException {
 		Map<String, Map<String, CaptureType>> result = new HashMap<>();
 		Set<Class<?>> entities = new Reflections(scanPath).getTypesAnnotatedWith(CaptureEntity.class);
@@ -124,9 +138,20 @@ public class CaptypeRenderer {
 
 	}
 
+	/**
+	 * Writes the entites metadata to a JSON file. If no filePath is provided,
+	 * creates the file in the default directory and gives it a default name. Also
+	 * adds the json extension in case the filePath does not contain it
+	 * 
+	 * @param filePath
+	 * @param result
+	 * @throws IOException
+	 */
 	private static void writeToFile(String filePath, Map<String, Map<String, CaptureType>> result) throws IOException {
 
 		if (filePath == null || filePath.isEmpty()) {
+//			DateTimeFormatter format = DateTimeFormatter.ofPattern ("dd-MM-yyyy");
+//			filePath = "captype-" + OffsetDateTime.now().format(format) + ".json";
 			filePath = "captype.json";
 		} else if (!filePath.endsWith(".json")) {
 			filePath.concat(".json");
