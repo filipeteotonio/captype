@@ -1,28 +1,43 @@
 package br.ironspark.model;
 
 import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Lob;
 import javax.validation.constraints.NotNull;
-import javax.validation.constraints.Pattern;
 import javax.validation.constraints.Size;
+
+import org.hibernate.annotations.Type;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import br.ironspark.captype.CaptureEntity;
 import br.ironspark.captype.CaptureField;
+import br.ironspark.captype.CaptureIgnore;
 import lombok.Data;
 
-@CaptureEntity(name = "Backlog")
-@Entity
 @Data
+@Entity
+@CaptureEntity(name = "Project")
 public class Project {
 
-	@CaptureField(name = "title", displayName = "Title", displayOrder = 10)
+	@CaptureIgnore
+	@Id
+	private Long id;
+
+	@JsonIgnore
 	@NotNull
-	@Size(min = 5)
+	@Size(max = 60)
 	private String name;
 
-	@CaptureField(name = "shortDescription", displayName = "Short description")
+	@CaptureField(displayName = "short")
 	@NotNull
-	@Pattern(regexp = "abcdefg")
-	@Size(max = 100)
-	private String email;
+	@Size(max = 60)
+	private String shortDescription;
+
+	@Lob
+	@Type(type = "org.hibernate.type.TextType")
+	private String longDescription;
+
+	private String base;
 
 }

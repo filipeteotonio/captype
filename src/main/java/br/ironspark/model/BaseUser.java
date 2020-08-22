@@ -5,11 +5,9 @@ import javax.validation.constraints.Max;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 
-import br.ironspark.captype.CaptureEntity;
 import br.ironspark.captype.CaptureField;
 import lombok.Data;
 
-@CaptureEntity(name = "User")
 @Entity
 @Data
 public class BaseUser {
