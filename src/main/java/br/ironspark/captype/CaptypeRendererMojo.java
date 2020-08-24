@@ -1,9 +1,14 @@
 package br.ironspark.captype;
 
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -19,6 +24,14 @@ import javax.validation.constraints.Pattern;
 import javax.validation.constraints.Size;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.maven.plugin.AbstractMojo;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugins.annotations.LifecyclePhase;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.plugins.annotations.ResolutionScope;
+import org.apache.maven.project.MavenProject;
 import org.reflections.Reflections;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -31,18 +44,30 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * @author filipemendonca
  *
  */
-public class CaptypeRenderer {
+@Mojo(name = "generate", defaultPhase = LifecyclePhase.PROCESS_CLASSES, requiresDependencyResolution = ResolutionScope.RUNTIME)
+public class CaptypeRendererMojo extends AbstractMojo {
 
-	private static String getEntityCaptureName(Class<?> entity) {
-		String value = entity.getAnnotation(CaptureEntity.class).name();
+	@Parameter(defaultValue = "${project}", required = true, readonly = true)
+	private MavenProject project;
+
+	@Parameter(property = "captype-render.scanPath", defaultValue = "", required = true)
+	private String scanPath;
+
+	@Parameter(property = "captype-render.outputFilePath", defaultValue = "./captype.json", required = true)
+	private String outputFilePath;
+
+	private String getEntityCaptureName(Class<?> entity) {
+		String value = "";
+		if (entity.isAnnotationPresent(CaptureEntity.class)) {
+			value = ((CaptureEntity) entity.getAnnotation(CaptureEntity.class)).name();
+		}
 		return value.isEmpty() ? entity.getSimpleName() : value;
 	}
 
-	private static String getFieldCaptureDisplayName(Field field, DisplayNameEstrategy estrategy) {
+	private String getFieldCaptureDisplayName(Field field, DisplayNameEstrategy estrategy) {
 		String value = "";
-
 		if (field.isAnnotationPresent(CaptureField.class)) {
-			value = field.getAnnotation(CaptureField.class).displayName();
+			value = ((CaptureField) field.getAnnotation(CaptureField.class)).displayName();
 		}
 
 		if (value.isEmpty()) {
@@ -65,10 +90,10 @@ public class CaptypeRenderer {
 		return value;
 	}
 
-	private static String getFieldCaptureName(Field field) {
+	private String getFieldCaptureName(Field field) {
 		String value = "";
 		if (field.isAnnotationPresent(CaptureField.class)) {
-			value = field.getAnnotation(CaptureField.class).name();
+			value = ((CaptureField) field.getAnnotation(CaptureField.class)).name();
 		}
 
 		if (value.isEmpty()) {
@@ -78,10 +103,11 @@ public class CaptypeRenderer {
 		return value;
 	}
 
-	private static int getFieldCaptureDisplayOrder(Field field) {
+	private int getFieldCaptureDisplayOrder(Field field) {
 		int value;
+
 		if (field.isAnnotationPresent(CaptureField.class)) {
-			value = field.getAnnotation(CaptureField.class).displayOrder();
+			value = ((CaptureField) field.getAnnotation(CaptureField.class)).displayOrder();
 		} else {
 			value = 0;
 		}
@@ -95,12 +121,12 @@ public class CaptypeRenderer {
 	 * @param filePath
 	 * @throws Exception
 	 */
-	public static void render(String scanPath, String filePath) throws Exception {
+	public void render(Set<Class<?>> entities, String filePath) throws Exception {
 		Map<String, Map<String, CaptureType>> result = new HashMap<>();
-		Set<Class<?>> entities = new Reflections(scanPath).getTypesAnnotatedWith(CaptureEntity.class);
+// 		Set<Class<?>> entities = new Reflections().getTypesAnnotatedWith(CaptureEntity.class);
 
 		for (Class<?> entity : entities) {
-			CaptureEntity captureEntityAnnotation = ((CaptureEntity) entity.getAnnotation(CaptureEntity.class));
+			CaptureEntity captureEntityAnnotation = entity.getAnnotation(CaptureEntity.class);
 			String entityName = getEntityCaptureName(entity);
 			Map<String, CaptureType> entityResult = new HashMap<>();
 
@@ -118,7 +144,7 @@ public class CaptypeRenderer {
 				if (!entityResult.containsKey(fieldName)) {
 					entityResult.put(fieldName, new CaptureType());
 				} else {
-					throw new Exception("Multiple fields declared with same name");
+					throw new DuplicateCaptureClassException();
 				}
 
 				CaptureType fieldCapture = entityResult.get(fieldName);
@@ -186,11 +212,9 @@ public class CaptypeRenderer {
 	 * @param result
 	 * @throws IOException
 	 */
-	private static void writeToFile(String filePath, Map<String, Map<String, CaptureType>> result) throws IOException {
+	private void writeToFile(String filePath, Map<String, Map<String, CaptureType>> result) throws IOException {
 
 		if (filePath == null || filePath.isEmpty()) {
-//			DateTimeFormatter format = DateTimeFormatter.ofPattern ("dd-MM-yyyy");
-//			filePath = "captype-" + OffsetDateTime.now().format(format) + ".json";
 			filePath = "captype.json";
 		} else if (!filePath.endsWith(".json")) {
 			filePath.concat(".json");
@@ -199,8 +223,35 @@ public class CaptypeRenderer {
 		FileWriter fw = new FileWriter(filePath);
 		ObjectMapper mapper = new ObjectMapper();
 		String jsonResult = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(result);
+
 		fw.write(jsonResult);
 		fw.flush();
 		fw.close();
+	}
+
+	@Override
+	@SuppressWarnings({ "unchecked" })
+	public void execute() throws MojoExecutionException, MojoFailureException {
+
+		try {
+
+			List<String> classpathElements = project.getCompileClasspathElements();
+			List<URL> projectClasspathList = new ArrayList<URL>();
+			for (String element : classpathElements) {
+				try {
+					projectClasspathList.add(new File(element).toURI().toURL());
+				} catch (MalformedURLException e) {
+					throw new MojoExecutionException(element + " is an invalid classpath element", e);
+				}
+			}
+
+			URLClassLoader loader = new URLClassLoader(projectClasspathList.toArray(new URL[0]),
+					getClass().getClassLoader());
+			Set<Class<?>> entities = new Reflections(loader, scanPath).getTypesAnnotatedWith(CaptureEntity.class);
+			render(entities, outputFilePath);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 }
