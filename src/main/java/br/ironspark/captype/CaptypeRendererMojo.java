@@ -24,6 +24,7 @@ import javax.validation.constraints.Pattern;
 import javax.validation.constraints.Size;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -121,7 +122,7 @@ public class CaptypeRendererMojo extends AbstractMojo {
 	 * @param filePath
 	 * @throws Exception
 	 */
-	public void render(Set<Class<?>> entities, String filePath) throws Exception {
+	public void render(Set<Class<?>> entities, String filePath) {
 		Map<String, Map<String, CaptureType>> result = new HashMap<>();
 // 		Set<Class<?>> entities = new Reflections().getTypesAnnotatedWith(CaptureEntity.class);
 
@@ -250,7 +251,7 @@ public class CaptypeRendererMojo extends AbstractMojo {
 			Set<Class<?>> entities = new Reflections(loader, scanPath).getTypesAnnotatedWith(CaptureEntity.class);
 			render(entities, outputFilePath);
 
-		} catch (Exception e) {
+		} catch (DuplicateCaptureClassException | DependencyResolutionRequiredException e) {
 			e.printStackTrace();
 		}
 	}

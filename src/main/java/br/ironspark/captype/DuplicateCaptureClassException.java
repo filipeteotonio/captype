@@ -1,6 +1,6 @@
 package br.ironspark.captype;
 
-public class DuplicateCaptureClassException extends Exception {
+public class DuplicateCaptureClassException extends RuntimeException {
 	/**
 	 * 
 	 */
